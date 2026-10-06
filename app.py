@@ -54,7 +54,7 @@ def obtener_incidentes():
 # BARRA LATERAL (SOBRIA CON GUIAS VISUALES)
 # ==========================================
 with st.sidebar:
-    st.markdown("### Clima y Riesgo - Ecuador")
+    st.markdown("### 🇪🇨 Clima y Riesgo - Ecuador")
     st.markdown("Panel de Control Operativo")
     st.markdown("---")
     
