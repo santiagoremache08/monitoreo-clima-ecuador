@@ -1,4 +1,4 @@
-# 🇪🇨 Clima y Riesgo - Ecuador
+# Clima y Riesgo - Ecuador
 
 > Centro de Monitoreo Climático y de Riesgos en tiempo real, impulsado por Ciencia de Datos y Procesamiento de Lenguaje Natural (NLP).
 
