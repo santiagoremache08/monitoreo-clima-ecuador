@@ -89,15 +89,36 @@ for _, fila in df_mostrar.iterrows():
         popup=f"{fila['Provincia']}: {fila['Precipitacion_Actual_mm']} mm"
     ).add_to(mapa)
 
-# CAPA 2: Incidentes detectados por NLP (Pines Rojos)
+# CAPA 2: Incidentes detectados por NLP (Pines Rojos con Diseño Profesional)
 if not df_incidentes.empty:
     for _, fila in df_incidentes.iterrows():
         if pd.notna(fila.get('Latitud')) and pd.notna(fila.get('Longitud')):
-            texto_popup = f"<b>{fila.get('Provincia', 'Alerta en Medios')}</b><br>{fila.get('Afectacion', '')}"
+            afectacion = fila.get('Afectacion', 'Detalle no disponible')
+            enlace = fila.get('Enlace', '#')
+            provincia = fila.get('Provincia', 'Ubicación')
+            
+            # Tarjeta profesional con CSS integrado
+            html_tarjeta = f"""
+            <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 260px; padding: 5px;">
+                <div style="background-color: #dc2626; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; display: inline-block; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;">
+                    🚨 Alerta Activa
+                </div>
+                <h4 style="margin: 0 0 8px 0; color: #111827; font-size: 16px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px;">
+                    {provincia}
+                </h4>
+                <p style="margin: 0 0 15px 0; color: #4b5563; font-size: 13px; line-height: 1.5;">
+                    {afectacion}
+                </p>
+                <a href="{enlace}" target="_blank" style="display: block; text-align: center; background-color: #2563eb; color: white; padding: 8px 12px; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 500; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);">
+                    Leer fuente oficial ↗
+                </a>
+            </div>
+            """
+            
             folium.Marker(
                 location=[fila['Latitud'], fila['Longitud']],
-                icon=folium.Icon(color="red", icon="info-sign"),
-                popup=folium.Popup(texto_popup, max_width=300)
+                icon=folium.Icon(color="red", icon="warning-sign"),
+                popup=folium.Popup(html_tarjeta, max_width=320)
             ).add_to(mapa)
 
 # Renderizar Mapa
