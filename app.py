@@ -4,9 +4,10 @@ import requests
 import folium
 from streamlit_folium import st_folium
 import os
+from datetime import datetime
 
 # Configuración de la página
-st.set_page_config(page_title="Monitoreo Clima Ecuador", layout="wide")
+st.set_page_config(page_title="Monitoreo Clima & Emergencias Ecuador", layout="wide")
 
 # Coordenadas base de las provincias
 PROVINCIAS = {
@@ -20,7 +21,7 @@ PROVINCIAS = {
     'Sucumbíos': (-0.0860, -76.8838), 'Tungurahua': (-1.2417, -78.6233), 'Zamora Chinchipe': (-4.0692, -78.9567)
 }
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=600, show_spinner=False)
 def obtener_clima_vivo():
     datos = []
     for prov, (lat, lon) in PROVINCIAS.items():
@@ -42,7 +43,7 @@ def obtener_clima_vivo():
             pass
     return pd.DataFrame(datos)
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=60, show_spinner=False)
 def obtener_incidentes():
     ruta = "data/deslaves_sgr.csv"
     if os.path.exists(ruta):
@@ -50,46 +51,43 @@ def obtener_incidentes():
     return pd.DataFrame()
 
 # ==========================================
-# INTERFAZ DE USUARIO Y BARRA LATERAL
+# BARRA LATERAL ESTETICA
 # ==========================================
-
-# Barra lateral (Filtros con botones y Leyenda)
 with st.sidebar:
-    st.markdown("### 🎛️ Controles del Tablero")
+    st.markdown("## 🛡️ SGR - Ecuador")
+    st.markdown("Sistema Autónomo de Alerta Temprana")
+    st.markdown("---")
     
-    # Filtro visual con botones de opción
     filtro_riesgo = st.radio(
-        "Filtrar mapa por clima:",
+        "⚡ Filtrar Capa Climática:",
         [
             "🌍 Mostrar Todo", 
             "🌧️ Solo Lluvia Activa", 
-            "⚠️ Riesgo Medio y Alto", 
+            "⚠️️ Riesgo Medio y Alto", 
             "🚨 Solo Riesgo Alto"
         ]
     )
     
     st.markdown("---")
-    
-    # Botón directo para refrescar la página sin usar menús ocultos
-    if st.button("🔄 Actualizar Datos Ahora"):
+    if st.button("🔄 Sincronizar Datos"):
         st.cache_data.clear()
         st.rerun()
 
     st.markdown("---")
-    st.markdown("### 📖 Leyenda")
-    st.markdown("🟢 **Riesgo Bajo:** < 2 mm")
-    st.markdown("🟠 **Riesgo Medio:** 2 - 10 mm")
-    st.markdown("🔴 **Riesgo Alto:** > 10 mm")
-    st.markdown("🚨 **Pin Rojo:** Alerta en Medios")
+    st.markdown("### 📖 Guía de Capas")
+    st.markdown("🔹 **Usa el menú flotante en la esquina superior derecha del mapa** para apagar o encender las capas de Lluvia y Alertas a voluntad.")
 
-st.markdown("### 📡 Panel de Monitoreo de Clima y Emergencias")
-st.markdown("Datos obtenidos en tiempo real. Nivel de riesgo calculado por la intensidad de precipitación actual.")
+# ==========================================
+# CABECERA Y METRICAS
+# ==========================================
+st.title("📡 Monitor Operativo de Emergencias y Clima")
+hora_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+st.markdown(f"**Última actualización de telemetría:** `{hora_actual}` | **Fuente:** Open-Meteo & Google News NLP")
 
-# Carga de DataFrames
 df_clima = obtener_clima_vivo()
 df_incidentes = obtener_incidentes()
 
-# Aplicar los filtros de botones
+# Filtrado
 if filtro_riesgo == "🌍 Mostrar Todo":
     df_mostrar = df_clima
 elif filtro_riesgo == "🌧️ Solo Lluvia Activa":
@@ -99,77 +97,98 @@ elif filtro_riesgo == "⚠️ Riesgo Medio y Alto":
 elif filtro_riesgo == "🚨 Solo Riesgo Alto":
     df_mostrar = df_clima[df_clima['Precipitacion_Actual_mm'] >= 10]
 
-# Métricas superiores
-col1, col2, col3 = st.columns(3)
-col1.metric("Provincias en Pantalla", len(df_mostrar))
-col2.metric("Provincias con Lluvia Activa", len(df_clima[df_clima['Precipitacion_Actual_mm'] > 0]))
-col3.metric("Riesgo Alto Detectado", len(df_clima[df_clima['Riesgo_Inmediato'] == 'Alto']))
+# Métricas estilizadas
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Provincias Analizadas", len(df_clima))
+col2.metric("Provincias con Lluvia", len(df_clima[df_clima['Precipitacion_Actual_mm'] > 0]))
+col3.metric("Riesgo Alto (Clima)", len(df_clima[df_clima['Riesgo_Inmediato'] == 'Alto']))
+col4.metric("Incidentes en Medios", len(df_incidentes))
 
-# Inicializar Mapa
-mapa = folium.Map(location=[-1.83, -78.18], zoom_start=6)
+st.markdown("---")
 
-# CAPA 1: Clima 
-for _, fila in df_mostrar.iterrows():
-    color = "#d32f2f" if fila['Riesgo_Inmediato'] == 'Alto' else "#f57c00" if fila['Riesgo_Inmediato'] == 'Medio' else "#388e3c"
+# ==========================================
+# CREACIÓN DE PESTAÑAS (UX PROFESIONAL)
+# ==========================================
+pestana_mapa, pestana_tabla = st.tabs(["🗺️ Mapa Interactivo de Riesgos", "📊 Base de Datos y Telemetría"])
+
+with pestana_mapa:
+    st.info("💡 **Consejo para celulares:** Despliega el menú de capas en la esquina superior derecha del mapa para alternar entre ver solo el clima o solo las alertas de medios.")
     
-    html_clima = f"""
-    <div style="font-family: 'Segoe UI', sans-serif; width: 160px;">
-        <b style="font-size: 15px; color: #111827;">{fila['Provincia']}</b><br>
-        <hr style="margin: 6px 0; border: 0; border-top: 1px solid #e5e7eb;">
-        🌧️ <b>Lluvia:</b> {fila['Precipitacion_Actual_mm']} mm<br>
-        🌡️ <b>Temp:</b> {fila['Temperatura_C']} °C<br>
-        💧 <b>Humedad:</b> {fila['Humedad_Pct']}%<br>
-        💨 <b>Viento:</b> {fila['Viento_kmh']} km/h<br>
-        <hr style="margin: 6px 0; border: 0; border-top: 1px solid #e5e7eb;">
-        <b>Riesgo:</b> <span style="color: {color}; font-weight: bold;">{fila['Riesgo_Inmediato']}</span>
-    </div>
-    """
-    
-    folium.CircleMarker(
-        location=[fila['Latitud'], fila['Longitud']],
-        radius=8 + (fila['Precipitacion_Actual_mm'] * 2),
-        color=color, fill=True, fill_color=color, fill_opacity=0.6,
-        popup=folium.Popup(html_clima, max_width=200)
-    ).add_to(mapa)
+    # Inicializar Mapa base
+    mapa = folium.Map(location=[-1.83, -78.18], zoom_start=6, control_scale=True)
 
-# CAPA 2: Incidentes detectados por NLP 
-if not df_incidentes.empty:
-    for _, fila in df_incidentes.iterrows():
-        if pd.notna(fila.get('Latitud')) and pd.notna(fila.get('Longitud')):
-            afectacion = fila.get('Afectacion', 'Detalle no disponible')
-            provincia = fila.get('Provincia', 'Ubicación')
-            enlace = fila.get('Enlace', '#')
-            
-            # Validación: Si no hay enlace en el CSV, mostrar aviso. Si lo hay, mostrar botón.
-            if pd.isna(enlace) or enlace == '#':
-                html_boton = f"""<div style="text-align: center; color: #6b7280; font-size: 11px; margin-top: 12px; font-style: italic;">Ejecuta el bot en GitHub para activar el link</div>"""
-            else:
-                html_boton = f"""<a href="{enlace}" target="_blank" style="display: block; text-align: center; background-color: #2563eb; color: white; padding: 8px 12px; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 500; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2); margin-top: 10px;">Leer fuente oficial ↗</a>"""
-            
-            html_tarjeta = f"""
-            <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 260px; padding: 5px;">
-                <div style="background-color: #dc2626; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; display: inline-block; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;">
-                    🚨 Alerta Activa
+    # Crear Grupos de Capas independientes para evitar el amontonamiento
+    capa_clima = folium.FeatureGroup(name="🌧️ Estaciones Meteorológicas (Clima)").add_to(mapa)
+    capa_incidentes = folium.FeatureGroup(name="🚨 Alertas de Emergencia (Medios)").add_to(mapa)
+
+    # CAPA 1: Clima (Agregada al grupo de clima)
+    for _, fila in df_mostrar.iterrows():
+        color = "#d32f2f" if fila['Riesgo_Inmediato'] == 'Alto' else "#f57c00" if fila['Riesgo_Inmediato'] == 'Medio' else "#388e3c"
+        
+        html_clima = f"""
+        <div style="font-family: 'Segoe UI', sans-serif; width: 160px;">
+            <b style="font-size: 15px; color: #111827;">{fila['Provincia']}</b><br>
+            <hr style="margin: 6px 0; border: 0; border-top: 1px solid #e5e7eb;">
+            🌧️ <b>Lluvia:</b> {fila['Precipitacion_Actual_mm']} mm<br>
+            🌡️ <b>Temp:</b> {fila['Temperatura_C']} °C<br>
+            💧 <b>Humedad:</b> {fila['Humedad_Pct']}%<br>
+            💨 <b>Viento:</b> {fila['Viento_kmh']} km/h<br>
+            <hr style="margin: 6px 0; border: 0; border-top: 1px solid #e5e7eb;">
+            <b>Riesgo:</b> <span style="color: {color}; font-weight: bold;">{fila['Riesgo_Inmediato']}</span>
+        </div>
+        """
+        
+        folium.CircleMarker(
+            location=[fila['Latitud'], fila['Longitud']],
+            radius=8 + (fila['Precipitacion_Actual_mm'] * 2),
+            color=color, fill=True, fill_color=color, fill_opacity=0.6,
+            popup=folium.Popup(html_clima, max_width=200)
+        ).add_to(capa_clima)
+
+    # CAPA 2: Incidentes (Agregada al grupo de incidentes)
+    if not df_incidentes.empty:
+        for _, fila in df_incidentes.iterrows():
+            if pd.notna(fila.get('Latitud')) and pd.notna(fila.get('Longitud')):
+                afectacion = fila.get('Afectacion', 'Detalle no disponible')
+                provincia = fila.get('Provincia', 'Ubicación')
+                enlace = fila.get('Enlace', '#')
+                
+                if pd.isna(enlace) or enlace == '#':
+                    html_boton = f"""<div style="text-align: center; color: #6b7280; font-size: 11px; margin-top: 12px; font-style: italic;">Enlace no disponible</div>"""
+                else:
+                    html_boton = f"""<a href="{enlace}" target="_blank" style="display: block; text-align: center; background-color: #2563eb; color: white; padding: 8px 12px; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 500; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2); margin-top: 10px;">Leer fuente oficial ↗</a>"""
+                
+                html_tarjeta = f"""
+                <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 260px; padding: 5px;">
+                    <div style="background-color: #dc2626; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; display: inline-block; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        🚨 Alerta Activa
+                    </div>
+                    <h4 style="margin: 0 0 8px 0; color: #111827; font-size: 16px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px;">
+                        {provincia}
+                    </h4>
+                    <p style="margin: 0 0 5px 0; color: #4b5563; font-size: 13px; line-height: 1.5;">
+                        {afectacion}
+                    </p>
+                    {html_boton}
                 </div>
-                <h4 style="margin: 0 0 8px 0; color: #111827; font-size: 16px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px;">
-                    {provincia}
-                </h4>
-                <p style="margin: 0 0 5px 0; color: #4b5563; font-size: 13px; line-height: 1.5;">
-                    {afectacion}
-                </p>
-                {html_boton}
-            </div>
-            """
-            
-            folium.Marker(
-                location=[fila['Latitud'], fila['Longitud']],
-                icon=folium.Icon(color="red", icon="warning-sign"),
-                popup=folium.Popup(html_tarjeta, max_width=320)
-            ).add_to(mapa)
+                """
+                
+                folium.Marker(
+                    location=[fila['Latitud'], fila['Longitud']],
+                    icon=folium.Icon(color="red", icon="warning-sign"),
+                    popup=folium.Popup(html_tarjeta, max_width=320)
+                ).add_to(capa_incidentes)
 
-# Renderizar Mapa
-st_folium(mapa, width=1000, height=500)
+    # Añadir el control de capas flotante para que el usuario elija qué ver
+    folium.LayerControl(collapsed=False).add_to(mapa)
 
-# Tabla Inferior
-st.markdown("### Datos de Telemetría")
-st.dataframe(df_mostrar.drop(columns=['Latitud', 'Longitud']), use_container_width=True)
+    # Renderizar Mapa
+    st_folium(mapa, width=1200, height=600)
+
+with pestana_tabla:
+    st.markdown("### 📋 Registro Tabular de Telemetría Climática")
+    st.dataframe(df_mostrar.drop(columns=['Latitud', 'Longitud']), use_container_width=True)
+    
+    if not df_incidentes.empty:
+        st.markdown("### 🚨 Registro de Alertas Extraídas por NLP")
+        st.dataframe(df_incidentes, use_container_width=True)
