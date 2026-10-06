@@ -30,7 +30,6 @@ jobs:
         run: |
           git config --global user.name "Bot-Actualizador"
           git config --global user.email "bot@tu-proyecto.com"
-          git add data/deslaves_sgr.csv
-          # El '|| exit 0' evita que el proceso marque error si la SGR no subió desastres nuevos hoy
+          git add data/ || true
           git commit -m "Actualización automática: nuevos reportes SGR" || exit 0
           git push
