@@ -4,7 +4,7 @@ import requests
 import folium
 from streamlit_folium import st_folium
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 # Configuración de la página
 st.set_page_config(page_title="Centro de Monitoreo | Clima y Riesgo Ecuador", layout="wide")
@@ -51,7 +51,7 @@ def obtener_incidentes():
     return pd.DataFrame()
 
 # ==========================================
-# BARRA LATERAL (SOBRIA CON GUIAS VISUALES)
+# BARRA LATERAL 
 # ==========================================
 with st.sidebar:
     st.markdown("### 🇪🇨 Clima y Riesgo - Ecuador")
@@ -83,10 +83,14 @@ with st.sidebar:
     )
 
 # ==========================================
-# CABECERA Y METRICAS
+# CABECERA Y METRICAS (Hora ajustada a Ecuador GMT-5)
 # ==========================================
 st.title("Centro de Monitoreo Climático y de Riesgos - Ecuador")
-hora_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+# Forzar zona horaria de Ecuador (UTC-5) sin importar el servidor en la nube
+zona_ecuador = timezone(timedelta(hours=-5))
+hora_actual = datetime.now(zona_ecuador).strftime("%d/%m/%Y %H:%M")
+
 st.markdown(f"**Última actualización:** `{hora_actual}` | **Fuentes:** Open-Meteo & RSS NLP")
 
 df_clima = obtener_clima_vivo()
@@ -117,7 +121,6 @@ st.markdown("---")
 pestana_mapa, pestana_tabla = st.tabs(["🗺️ Mapa Interactivo", "📋 Registros y Telemetría"])
 
 with pestana_mapa:
-    # Inicializar Mapa base
     mapa = folium.Map(location=[-1.83, -78.18], zoom_start=6, control_scale=True)
 
     # CAPA 1: Clima (Círculos)
@@ -184,7 +187,6 @@ with pestana_mapa:
                     popup=folium.Popup(html_tarjeta, max_width=320)
                 ).add_to(mapa)
 
-    # Renderizar Mapa limpio
     st_folium(mapa, width=1200, height=600)
 
 with pestana_tabla:
