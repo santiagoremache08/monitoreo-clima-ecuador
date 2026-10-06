@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 
 # Configuración de la página
-st.set_page_config(page_title="Monitoreo Clima & Emergencias Ecuador", layout="wide")
+st.set_page_config(page_title="Clima y Riesgo Ecuador", layout="wide")
 
 # Coordenadas base de las provincias
 PROVINCIAS = {
@@ -51,19 +51,19 @@ def obtener_incidentes():
     return pd.DataFrame()
 
 # ==========================================
-# BARRA LATERAL ESTETICA
+# BARRA LATERAL 
 # ==========================================
 with st.sidebar:
-    st.markdown("## 🛡️ SGR - Ecuador")
-    st.markdown("Sistema Autónomo de Alerta Temprana")
+    st.markdown("## 🌦️ Clima y Riesgo")
+    st.markdown("Monitoreo de Amenazas en Vivo")
     st.markdown("---")
     
     filtro_riesgo = st.radio(
-        "⚡ Filtrar Capa Climática:",
+        "⚡ Filtrar Mapa:",
         [
             "🌍 Mostrar Todo", 
             "🌧️ Solo Lluvia Activa", 
-            "⚠️️ Riesgo Medio y Alto", 
+            "⚠ Riesgo Medio y Alto", 
             "🚨 Solo Riesgo Alto"
         ]
     )
@@ -74,20 +74,24 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    st.markdown("### 📖 Guía de Capas")
-    st.markdown("🔹 **Usa el menú flotante en la esquina superior derecha del mapa** para apagar o encender las capas de Lluvia y Alertas a voluntad.")
+    st.markdown("### 📌 ¿Qué muestra este panel?")
+    st.markdown(
+        "Integra condiciones meteorológicas en tiempo real con noticias de última hora "
+        "procesadas mediante Inteligencia Artificial (NLP), permitiendo visualizar "
+        "riesgos climáticos e incidentes geolocalizados en el país."
+    )
 
 # ==========================================
 # CABECERA Y METRICAS
 # ==========================================
-st.title("📡 Monitor Operativo de Emergencias y Clima")
+st.title("📊 Panel de Monitoreo: Clima y Riesgo")
 hora_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
-st.markdown(f"**Última actualización de telemetría:** `{hora_actual}` | **Fuente:** Open-Meteo & Google News NLP")
+st.markdown(f"**Última actualización:** `{hora_actual}` | **Fuentes:** Open-Meteo & RSS NLP")
 
 df_clima = obtener_clima_vivo()
 df_incidentes = obtener_incidentes()
 
-# Filtrado
+# Filtrado de clima
 if filtro_riesgo == "🌍 Mostrar Todo":
     df_mostrar = df_clima
 elif filtro_riesgo == "🌧️ Solo Lluvia Activa":
@@ -102,26 +106,20 @@ col1, col2, col3, col4 = st.columns(4)
 col1.metric("Provincias Analizadas", len(df_clima))
 col2.metric("Provincias con Lluvia", len(df_clima[df_clima['Precipitacion_Actual_mm'] > 0]))
 col3.metric("Riesgo Alto (Clima)", len(df_clima[df_clima['Riesgo_Inmediato'] == 'Alto']))
-col4.metric("Incidentes en Medios", len(df_incidentes))
+col4.metric("Alertas en Medios", len(df_incidentes))
 
 st.markdown("---")
 
 # ==========================================
 # CREACIÓN DE PESTAÑAS (UX PROFESIONAL)
 # ==========================================
-pestana_mapa, pestana_tabla = st.tabs(["🗺️ Mapa Interactivo de Riesgos", "📊 Base de Datos y Telemetría"])
+pestana_mapa, pestana_tabla = st.tabs(["🗺️ Mapa Interactivo", "📋 Registros y Telemetría"])
 
 with pestana_mapa:
-    st.info("💡 **Consejo para celulares:** Despliega el menú de capas en la esquina superior derecha del mapa para alternar entre ver solo el clima o solo las alertas de medios.")
-    
     # Inicializar Mapa base
     mapa = folium.Map(location=[-1.83, -78.18], zoom_start=6, control_scale=True)
 
-    # Crear Grupos de Capas independientes para evitar el amontonamiento
-    capa_clima = folium.FeatureGroup(name="🌧️ Estaciones Meteorológicas (Clima)").add_to(mapa)
-    capa_incidentes = folium.FeatureGroup(name="🚨 Alertas de Emergencia (Medios)").add_to(mapa)
-
-    # CAPA 1: Clima (Agregada al grupo de clima)
+    # CAPA 1: Clima (Círculos)
     for _, fila in df_mostrar.iterrows():
         color = "#d32f2f" if fila['Riesgo_Inmediato'] == 'Alto' else "#f57c00" if fila['Riesgo_Inmediato'] == 'Medio' else "#388e3c"
         
@@ -143,12 +141,19 @@ with pestana_mapa:
             radius=8 + (fila['Precipitacion_Actual_mm'] * 2),
             color=color, fill=True, fill_color=color, fill_opacity=0.6,
             popup=folium.Popup(html_clima, max_width=200)
-        ).add_to(capa_clima)
+        ).add_to(mapa)
 
-    # CAPA 2: Incidentes (Agregada al grupo de incidentes)
+    # CAPA 2: Incidentes (Pines Rojos con Desplazamiento Inteligente)
     if not df_incidentes.empty:
         for _, fila in df_incidentes.iterrows():
-            if pd.notna(fila.get('Latitud')) and pd.notna(fila.get('Longitud')):
+            lat = fila.get('Latitud')
+            lon = fila.get('Longitud')
+            
+            if pd.notna(lat) and pd.notna(lon):
+                # Desplazamiento sutil para evitar superposición exacta con el círculo verde
+                lat_desplazada = lat + 0.08
+                lon_desplazada = lon + 0.04
+                
                 afectacion = fila.get('Afectacion', 'Detalle no disponible')
                 provincia = fila.get('Provincia', 'Ubicación')
                 enlace = fila.get('Enlace', '#')
@@ -174,21 +179,18 @@ with pestana_mapa:
                 """
                 
                 folium.Marker(
-                    location=[fila['Latitud'], fila['Longitud']],
+                    location=[lat_desplazada, lon_desplazada],
                     icon=folium.Icon(color="red", icon="warning-sign"),
                     popup=folium.Popup(html_tarjeta, max_width=320)
-                ).add_to(capa_incidentes)
+                ).add_to(mapa)
 
-    # Añadir el control de capas flotante para que el usuario elija qué ver
-    folium.LayerControl(collapsed=False).add_to(mapa)
-
-    # Renderizar Mapa
+    # Renderizar Mapa limpio
     st_folium(mapa, width=1200, height=600)
 
 with pestana_tabla:
-    st.markdown("### 📋 Registro Tabular de Telemetría Climática")
+    st.markdown("### 📋 Telemetría Meteorológica")
     st.dataframe(df_mostrar.drop(columns=['Latitud', 'Longitud']), use_container_width=True)
     
     if not df_incidentes.empty:
-        st.markdown("### 🚨 Registro de Alertas Extraídas por NLP")
+        st.markdown("### 🚨 Alertas Procesadas por IA")
         st.dataframe(df_incidentes, use_container_width=True)
