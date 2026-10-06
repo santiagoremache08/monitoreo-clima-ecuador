@@ -53,17 +53,29 @@ def obtener_incidentes():
 # INTERFAZ DE USUARIO Y BARRA LATERAL
 # ==========================================
 
-# Barra lateral (Filtros y Leyenda)
+# Barra lateral (Filtros con botones y Leyenda)
 with st.sidebar:
     st.markdown("### 🎛️ Controles del Tablero")
-    solo_lluvia = st.checkbox("🌧️ Mostrar solo zonas con lluvia actual")
     
-    # Nuevo complemento: Slider para filtrar por intensidad
-    lluvia_minima = st.slider("💧 Lluvia mínima (mm)", min_value=0.0, max_value=20.0, value=0.0, step=0.5)
+    # Filtro visual con botones de opción
+    filtro_riesgo = st.radio(
+        "Filtrar mapa por clima:",
+        [
+            "🌍 Mostrar Todo", 
+            "🌧️ Solo Lluvia Activa", 
+            "⚠️ Riesgo Medio y Alto", 
+            "🚨 Solo Riesgo Alto"
+        ]
+    )
     
     st.markdown("---")
     
-    # Nuevo complemento: Leyenda del mapa
+    # Botón directo para refrescar la página sin usar menús ocultos
+    if st.button("🔄 Actualizar Datos Ahora"):
+        st.cache_data.clear()
+        st.rerun()
+
+    st.markdown("---")
     st.markdown("### 📖 Leyenda")
     st.markdown("🟢 **Riesgo Bajo:** < 2 mm")
     st.markdown("🟠 **Riesgo Medio:** 2 - 10 mm")
@@ -77,10 +89,15 @@ st.markdown("Datos obtenidos en tiempo real. Nivel de riesgo calculado por la in
 df_clima = obtener_clima_vivo()
 df_incidentes = obtener_incidentes()
 
-# Aplicar los nuevos filtros de la barra lateral
-df_mostrar = df_clima[df_clima['Precipitacion_Actual_mm'] >= lluvia_minima]
-if solo_lluvia:
-    df_mostrar = df_mostrar[df_mostrar['Precipitacion_Actual_mm'] > 0]
+# Aplicar los filtros de botones
+if filtro_riesgo == "🌍 Mostrar Todo":
+    df_mostrar = df_clima
+elif filtro_riesgo == "🌧️ Solo Lluvia Activa":
+    df_mostrar = df_clima[df_clima['Precipitacion_Actual_mm'] > 0]
+elif filtro_riesgo == "⚠️ Riesgo Medio y Alto":
+    df_mostrar = df_clima[df_clima['Precipitacion_Actual_mm'] >= 2]
+elif filtro_riesgo == "🚨 Solo Riesgo Alto":
+    df_mostrar = df_clima[df_clima['Precipitacion_Actual_mm'] >= 10]
 
 # Métricas superiores
 col1, col2, col3 = st.columns(3)
@@ -91,11 +108,10 @@ col3.metric("Riesgo Alto Detectado", len(df_clima[df_clima['Riesgo_Inmediato'] =
 # Inicializar Mapa
 mapa = folium.Map(location=[-1.83, -78.18], zoom_start=6)
 
-# CAPA 1: Clima (Ahora con tarjetas HTML de telemetría completa)
+# CAPA 1: Clima 
 for _, fila in df_mostrar.iterrows():
     color = "#d32f2f" if fila['Riesgo_Inmediato'] == 'Alto' else "#f57c00" if fila['Riesgo_Inmediato'] == 'Medio' else "#388e3c"
     
-    # Tarjeta de clima con CSS
     html_clima = f"""
     <div style="font-family: 'Segoe UI', sans-serif; width: 160px;">
         <b style="font-size: 15px; color: #111827;">{fila['Provincia']}</b><br>
@@ -116,15 +132,20 @@ for _, fila in df_mostrar.iterrows():
         popup=folium.Popup(html_clima, max_width=200)
     ).add_to(mapa)
 
-# CAPA 2: Incidentes detectados por NLP (Pines Rojos con Diseño Profesional)
+# CAPA 2: Incidentes detectados por NLP 
 if not df_incidentes.empty:
     for _, fila in df_incidentes.iterrows():
         if pd.notna(fila.get('Latitud')) and pd.notna(fila.get('Longitud')):
             afectacion = fila.get('Afectacion', 'Detalle no disponible')
-            enlace = fila.get('Enlace', '#')
             provincia = fila.get('Provincia', 'Ubicación')
+            enlace = fila.get('Enlace', '#')
             
-            # Tarjeta profesional con CSS integrado
+            # Validación: Si no hay enlace en el CSV, mostrar aviso. Si lo hay, mostrar botón.
+            if pd.isna(enlace) or enlace == '#':
+                html_boton = f"""<div style="text-align: center; color: #6b7280; font-size: 11px; margin-top: 12px; font-style: italic;">Ejecuta el bot en GitHub para activar el link</div>"""
+            else:
+                html_boton = f"""<a href="{enlace}" target="_blank" style="display: block; text-align: center; background-color: #2563eb; color: white; padding: 8px 12px; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 500; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2); margin-top: 10px;">Leer fuente oficial ↗</a>"""
+            
             html_tarjeta = f"""
             <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 260px; padding: 5px;">
                 <div style="background-color: #dc2626; color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; display: inline-block; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;">
@@ -133,12 +154,10 @@ if not df_incidentes.empty:
                 <h4 style="margin: 0 0 8px 0; color: #111827; font-size: 16px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px;">
                     {provincia}
                 </h4>
-                <p style="margin: 0 0 15px 0; color: #4b5563; font-size: 13px; line-height: 1.5;">
+                <p style="margin: 0 0 5px 0; color: #4b5563; font-size: 13px; line-height: 1.5;">
                     {afectacion}
                 </p>
-                <a href="{enlace}" target="_blank" style="display: block; text-align: center; background-color: #2563eb; color: white; padding: 8px 12px; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 500; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);">
-                    Leer fuente oficial ↗
-                </a>
+                {html_boton}
             </div>
             """
             
