@@ -26,10 +26,8 @@ jobs:
       - name: ⚙️ Ejecutar pipeline de extracción
         run: python pipeline_sgr.py
         
-      - name: 💾 Guardar el nuevo CSV en el repositorio
+      - name: 📦 Instalar dependencias
         run: |
-          git config --global user.name "Bot-Actualizador"
-          git config --global user.email "bot@tu-proyecto.com"
-          git add data/ || true
-          git commit -m "Actualización automática: nuevos reportes SGR" || exit 0
-          git push
+          python -m pip install --upgrade pip
+          pip install pandas requests beautifulsoup4 spacy lxml
+          python -m spacy download es_core_news_sm
