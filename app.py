@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 
 # Configuración de la página
-st.set_page_config(page_title="Clima y Riesgo Ecuador", layout="wide")
+st.set_page_config(page_title="Centro de Monitoreo | Clima y Riesgo Ecuador", layout="wide")
 
 # Coordenadas base de las provincias
 PROVINCIAS = {
@@ -51,19 +51,19 @@ def obtener_incidentes():
     return pd.DataFrame()
 
 # ==========================================
-# BARRA LATERAL 
+# BARRA LATERAL (SOBRIA CON GUIAS VISUALES)
 # ==========================================
 with st.sidebar:
-    st.markdown("## 🌦️ Clima y Riesgo")
-    st.markdown("Monitoreo de Amenazas en Vivo")
+    st.markdown("### Clima y Riesgo - Ecuador")
+    st.markdown("Panel de Control Operativo")
     st.markdown("---")
     
     filtro_riesgo = st.radio(
-        "⚡ Filtrar Mapa:",
+        "Filtrar Vista del Mapa",
         [
             "🌍 Mostrar Todo", 
             "🌧️ Solo Lluvia Activa", 
-            "⚠ Riesgo Medio y Alto", 
+            "⚠️ Riesgo Medio y Alto", 
             "🚨 Solo Riesgo Alto"
         ]
     )
@@ -74,17 +74,18 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    st.markdown("### 📌 ¿Qué muestra este panel?")
+    st.markdown("#### Descripción General")
     st.markdown(
-        "Integra condiciones meteorológicas en tiempo real con noticias de última hora "
-        "procesadas mediante Inteligencia Artificial (NLP), permitiendo visualizar "
-        "riesgos climáticos e incidentes geolocalizados en el país."
+        "Sistema analítico enfocado en el territorio ecuatoriano que integra telemetría "
+        "meteorológica en tiempo real con extracción automatizada de noticias mediante "
+        "procesamiento de lenguaje natural (NLP), permitiendo la identificación temprana "
+        "de riesgos e incidentes geolocalizados."
     )
 
 # ==========================================
 # CABECERA Y METRICAS
 # ==========================================
-st.title("📊 Panel de Monitoreo: Clima y Riesgo")
+st.title("Centro de Monitoreo Climático y de Riesgos - Ecuador")
 hora_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
 st.markdown(f"**Última actualización:** `{hora_actual}` | **Fuentes:** Open-Meteo & RSS NLP")
 
@@ -111,7 +112,7 @@ col4.metric("Alertas en Medios", len(df_incidentes))
 st.markdown("---")
 
 # ==========================================
-# CREACIÓN DE PESTAÑAS (UX PROFESIONAL)
+# CREACIÓN DE PESTAÑAS
 # ==========================================
 pestana_mapa, pestana_tabla = st.tabs(["🗺️ Mapa Interactivo", "📋 Registros y Telemetría"])
 
@@ -150,7 +151,6 @@ with pestana_mapa:
             lon = fila.get('Longitud')
             
             if pd.notna(lat) and pd.notna(lon):
-                # Desplazamiento sutil para evitar superposición exacta con el círculo verde
                 lat_desplazada = lat + 0.08
                 lon_desplazada = lon + 0.04
                 
@@ -161,7 +161,7 @@ with pestana_mapa:
                 if pd.isna(enlace) or enlace == '#':
                     html_boton = f"""<div style="text-align: center; color: #6b7280; font-size: 11px; margin-top: 12px; font-style: italic;">Enlace no disponible</div>"""
                 else:
-                    html_boton = f"""<a href="{enlace}" target="_blank" style="display: block; text-align: center; background-color: #2563eb; color: white; padding: 8px 12px; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 500; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2); margin-top: 10px;">Leer fuente oficial ↗</a>"""
+                    html_boton = f"""<a href="{enlace}" target="_blank" style="display: block; text-align: center; background-color: #2563eb; color: white; padding: 8px 12px; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 500; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2); margin-top: 10px;">Ver Fuente Original ↗</a>"""
                 
                 html_tarjeta = f"""
                 <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; width: 260px; padding: 5px;">
