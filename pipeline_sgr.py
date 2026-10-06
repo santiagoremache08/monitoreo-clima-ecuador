@@ -15,7 +15,7 @@ except OSError:
 
 def extraer_alertas_rss():
     print("Consultando el feed de noticias de última hora...")
-    # Feed RSS de Google News filtrado por deslaves/inundaciones en Ecuador (últimos 3 días)
+    # Feed RSS de Google News filtrado por deslaves/inundaciones en Ecuador
     url = "https://news.google.com/rss/search?q=inundacion+OR+deslave+OR+aluvion+ecuador+when:3d&hl=es-419&gl=US&ceid=US:es-419"
     
     respuesta = requests.get(url)
@@ -66,8 +66,9 @@ def procesar_entidades_geograficas(noticias):
                         'Latitud': lat,
                         'Longitud': lon,
                         'Fecha': noti['fecha'],
-                        'Afectacion': noti['titulo'][:80] + "...", # Truncar para limpieza visual
-                        'Estado_Via': 'Alerta en Medios'
+                        'Afectacion': noti['titulo'], # Guardamos el texto completo sin recortar
+                        'Estado_Via': 'Alerta en Medios',
+                        'Enlace': noti['enlace']      # Guardamos el link oficial de la noticia
                     })
                     break 
                     
@@ -87,7 +88,7 @@ if __name__ == "__main__":
             if not os.path.exists('data'):
                 os.makedirs('data')
             df_final.to_csv('data/deslaves_sgr.csv', index=False)
-            print(f"✅ Pipeline exitoso. {len(df_final)} incidentes mapeados.")
+            print(f"✅ Pipeline exitoso. {len(df_final)} incidentes mapeados con enlaces.")
         else:
             print("⚠️ No se encontraron ubicaciones extraíbles en las noticias de hoy.")
     else:
