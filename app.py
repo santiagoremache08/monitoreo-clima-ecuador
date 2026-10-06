@@ -50,43 +50,70 @@ def obtener_incidentes():
     return pd.DataFrame()
 
 # ==========================================
-# INTERFAZ DE USUARIO
+# INTERFAZ DE USUARIO Y BARRA LATERAL
 # ==========================================
 
-# Barra lateral (Filtros)
+# Barra lateral (Filtros y Leyenda)
 with st.sidebar:
-    st.markdown("### Filtros en Vivo")
-    solo_lluvia = st.checkbox("Mostrar solo provincias con lluvia actual")
+    st.markdown("### 🎛️ Controles del Tablero")
+    solo_lluvia = st.checkbox("🌧️ Mostrar solo zonas con lluvia actual")
+    
+    # Nuevo complemento: Slider para filtrar por intensidad
+    lluvia_minima = st.slider("💧 Lluvia mínima (mm)", min_value=0.0, max_value=20.0, value=0.0, step=0.5)
+    
+    st.markdown("---")
+    
+    # Nuevo complemento: Leyenda del mapa
+    st.markdown("### 📖 Leyenda")
+    st.markdown("🟢 **Riesgo Bajo:** < 2 mm")
+    st.markdown("🟠 **Riesgo Medio:** 2 - 10 mm")
+    st.markdown("🔴 **Riesgo Alto:** > 10 mm")
+    st.markdown("🚨 **Pin Rojo:** Alerta en Medios")
 
+st.markdown("### 📡 Panel de Monitoreo de Clima y Emergencias")
 st.markdown("Datos obtenidos en tiempo real. Nivel de riesgo calculado por la intensidad de precipitación actual.")
 
 # Carga de DataFrames
 df_clima = obtener_clima_vivo()
 df_incidentes = obtener_incidentes()
 
-# Aplicar filtro si el checkbox está activo
+# Aplicar los nuevos filtros de la barra lateral
+df_mostrar = df_clima[df_clima['Precipitacion_Actual_mm'] >= lluvia_minima]
 if solo_lluvia:
-    df_mostrar = df_clima[df_clima['Precipitacion_Actual_mm'] > 0]
-else:
-    df_mostrar = df_clima
+    df_mostrar = df_mostrar[df_mostrar['Precipitacion_Actual_mm'] > 0]
 
 # Métricas superiores
 col1, col2, col3 = st.columns(3)
-col1.metric("Provincias Analizadas", len(df_clima))
+col1.metric("Provincias en Pantalla", len(df_mostrar))
 col2.metric("Provincias con Lluvia Activa", len(df_clima[df_clima['Precipitacion_Actual_mm'] > 0]))
 col3.metric("Riesgo Alto Detectado", len(df_clima[df_clima['Riesgo_Inmediato'] == 'Alto']))
 
 # Inicializar Mapa
 mapa = folium.Map(location=[-1.83, -78.18], zoom_start=6)
 
-# CAPA 1: Clima (Círculos verdes/amarillos/rojos)
+# CAPA 1: Clima (Ahora con tarjetas HTML de telemetría completa)
 for _, fila in df_mostrar.iterrows():
     color = "#d32f2f" if fila['Riesgo_Inmediato'] == 'Alto' else "#f57c00" if fila['Riesgo_Inmediato'] == 'Medio' else "#388e3c"
+    
+    # Tarjeta de clima con CSS
+    html_clima = f"""
+    <div style="font-family: 'Segoe UI', sans-serif; width: 160px;">
+        <b style="font-size: 15px; color: #111827;">{fila['Provincia']}</b><br>
+        <hr style="margin: 6px 0; border: 0; border-top: 1px solid #e5e7eb;">
+        🌧️ <b>Lluvia:</b> {fila['Precipitacion_Actual_mm']} mm<br>
+        🌡️ <b>Temp:</b> {fila['Temperatura_C']} °C<br>
+        💧 <b>Humedad:</b> {fila['Humedad_Pct']}%<br>
+        💨 <b>Viento:</b> {fila['Viento_kmh']} km/h<br>
+        <hr style="margin: 6px 0; border: 0; border-top: 1px solid #e5e7eb;">
+        <b>Riesgo:</b> <span style="color: {color}; font-weight: bold;">{fila['Riesgo_Inmediato']}</span>
+    </div>
+    """
+    
     folium.CircleMarker(
         location=[fila['Latitud'], fila['Longitud']],
         radius=8 + (fila['Precipitacion_Actual_mm'] * 2),
         color=color, fill=True, fill_color=color, fill_opacity=0.6,
-        popup=f"{fila['Provincia']}: {fila['Precipitacion_Actual_mm']} mm"
+        popup=folium.Popup(html_clima, max_width=200)
     ).add_to(mapa)
 
 # CAPA 2: Incidentes detectados por NLP (Pines Rojos con Diseño Profesional)
