@@ -15,8 +15,8 @@ except OSError:
 
 def extraer_alertas_rss():
     print("Consultando el feed de noticias de última hora...")
-    # Feed RSS de Google News filtrado por deslaves/inundaciones en Ecuador
-    url = "https://news.google.com/rss/search?q=inundacion+OR+deslave+OR+aluvion+ecuador+when:3d&hl=es-419&gl=US&ceid=US:es-419"
+    # Ampliamos el rango a 7 días y sumamos más términos de búsqueda operativos en Ecuador
+    url = "https://news.google.com/rss/search?q=inundacion+OR+deslave+OR+aluvion+OR+lluvias+OR+emergencia+ecuador+when:7d&hl=es-419&gl=US&ceid=US:es-419"
     
     respuesta = requests.get(url)
     soup = BeautifulSoup(respuesta.content, 'xml')
@@ -66,30 +66,40 @@ def procesar_entidades_geograficas(noticias):
                         'Latitud': lat,
                         'Longitud': lon,
                         'Fecha': noti['fecha'],
-                        'Afectacion': noti['titulo'], # Guardamos el texto completo sin recortar
+                        'Afectacion': noti['titulo'], 
                         'Estado_Via': 'Alerta en Medios',
-                        'Enlace': noti['enlace']      # Guardamos el link oficial de la noticia
+                        'Enlace': noti['enlace']      
                     })
                     break 
                     
     df = pd.DataFrame(eventos)
     if not df.empty:
-        # Eliminar noticias repetidas sobre el mismo evento
-        df = df.drop_duplicates(subset=['Afectacion', 'Latitud'])
+        # Eliminar duplicados basados en el enlace de la noticia
+        df = df.drop_duplicates(subset=['Enlace'])
     return df
 
 if __name__ == "__main__":
     noticias_crudas = extraer_alertas_rss()
     
     if noticias_crudas:
-        df_final = procesar_entidades_geograficas(noticias_crudas)
+        df_nuevo = procesar_entidades_geograficas(noticias_crudas)
         
-        if not df_final.empty:
+        if not df_nuevo.empty:
             if not os.path.exists('data'):
                 os.makedirs('data')
-            df_final.to_csv('data/deslaves_sgr.csv', index=False)
-            print(f"✅ Pipeline exitoso. {len(df_final)} incidentes mapeados con enlaces.")
+            
+            ruta_csv = 'data/deslaves_sgr.csv'
+            
+            # Si ya existe un archivo previo, combinamos para acumular histórico sin repetir
+            if os.path.exists(ruta_csv):
+                df_antiguo = pd.read_csv(ruta_csv)
+                df_final = pd.concat([df_nuevo, df_antiguo]).drop_duplicates(subset=['Enlace'])
+            else:
+                df_final = df_nuevo
+                
+            df_final.to_csv(ruta_csv, index=False)
+            print(f"✅ Pipeline exitoso. Total de incidentes acumulados: {len(df_final)}")
         else:
-            print("⚠️ No se encontraron ubicaciones extraíbles en las noticias de hoy.")
+            print("⚠️ No se encontraron ubicaciones extraíbles en las noticias recientes.")
     else:
-        print("Tranquilidad: No se registran noticias de emergencias.")
+        print("Tranquilidad: No se registran noticias de emergencias en el periodo consultado.")
